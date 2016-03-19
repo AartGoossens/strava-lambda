@@ -5,12 +5,7 @@ import copy
 import json
 import requests
 
-
-ACCESSS_TOKEN = '272d8a6a3141a661312b5834229920242d36f716'
-FOLLOWER_ACTIVITY_URL = 'https://www.strava.com/api/v3/activities/following?per_page=20'
-SLACK_URL = 'https://hooks.slack.com/services/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'
-S3_BUCKET = 'stravalambdabucket'
-S3_KEY = 'cached_activities'
+from params import *
 
 
 class LambdaClient(object):
@@ -20,7 +15,7 @@ class LambdaClient(object):
 
     def get_cached_activities(self):
         try:
-            resp = self.s3.get_object(Bucket=S3_BUCKET, Key=S3_KEY)
+            resp = self.s3.get_object(Bucket=S3_BUCKET, Key=S3_BUCKET_KEY)
             return ast.literal_eval(resp['Body'].read())
         except ClientError as e:
             self.errors.append(e)
@@ -29,15 +24,15 @@ class LambdaClient(object):
     def put_last_activities(self, cached_activities):
         resp = self.s3.put_object(
             Bucket=S3_BUCKET,
-            Key=S3_KEY,
+            Key=S3_BUCKET_KEY,
             Body=str(cached_activities)
         )
         self.errors.append(resp)
     
     def get_strava_activities(self):
         resp = requests.get(
-            FOLLOWER_ACTIVITY_URL,
-            headers = {'Authorization': 'Bearer ' + ACCESSS_TOKEN}
+            STRAVA_ACTIVITY_URL,
+            headers = {'Authorization': 'Bearer ' + STRAVA_ACCESS_TOKEN}
         )
         if resp.status_code != 200:
             raise RuntimeError
@@ -50,7 +45,7 @@ class LambdaClient(object):
             activity.get('id')
         )
 
-        resp = requests.post(SLACK_URL, data=json.dumps({
+        resp = requests.post(SLACK_WEBHOOK, data=json.dumps({
             'text': text,
             'icon_url': activity.get('athlete').get('profile_medium'),
             'username': u'{} {} (Strava Lambda)'.format(
